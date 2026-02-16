@@ -32,30 +32,69 @@ export default function Home() {
     setBookmarks(data || [])
   }
 
+  // ---------- REALTIME (FIXES YOUR ISSUE) ----------
   useEffect(() => {
-    if (user) fetchBookmarks()
+    if (!user) return
+
+    // initial fetch
+    fetchBookmarks()
+
+    // realtime subscription
+    const channel = supabase
+      .channel('realtime-bookmarks')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookmarks',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchBookmarks()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [user])
 
   // ---------- ADD ----------
-  const addBookmark = async () => {
-    if (!title || !url) return
+ const addBookmark = async () => {
+  if (!title || !url) return
 
-    await supabase.from('bookmarks').insert({
-      title,
-      url,
-      user_id: user.id,
-    })
-
-    setTitle('')
-    setUrl('')
-    fetchBookmarks() // ✅ refresh same tab
+  const temp = {
+    id: crypto.randomUUID(),
+    title,
+    url,
+    user_id: user.id,
+    created_at: new Date().toISOString(),
   }
+
+  // ✅ show instantly
+  setBookmarks((prev) => [temp, ...prev])
+
+  setTitle('')
+  setUrl('')
+
+  await supabase.from('bookmarks').insert({
+    title,
+    url,
+    user_id: user.id,
+  })
+}
 
   // ---------- DELETE ----------
-  const deleteBookmark = async (id: string) => {
-    await supabase.from('bookmarks').delete().eq('id', id)
-    fetchBookmarks() // ✅ refresh same tab
-  }
+const deleteBookmark = async (id: string) => {
+  // ✅ remove instantly from UI
+  setBookmarks((prev) => prev.filter((b) => b.id !== id))
+
+  // background delete
+  await supabase.from('bookmarks').delete().eq('id', id)
+}
+
 
   // ---------- UI ----------
   if (!user) {
@@ -99,7 +138,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* LIST */}
+      {/* BOOKMARK LIST */}
       <ul>
         {bookmarks.map((b) => (
           <li
