@@ -6,31 +6,31 @@ import { supabase } from '../lib/supabaseClient'
 export default function Home() {
   // ---------- AUTH ----------
   const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-    })
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null)
-      }
-    )
-
-    return () => {
-      listener.subscription.unsubscribe()
+useEffect(() => {
+  const { data: listener } = supabase.auth.onAuthStateChange(
+    (_event, session) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
     }
-  }, [])
+  )
+
+  return () => {
+    listener.subscription.unsubscribe()
+  }
+}, [])
+
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google' })
   }
 
-  const signOut = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-  }
+const signOut = async () => {
+  await supabase.auth.signOut()
+}
+
 
   // ---------- STATE ----------
   const [title, setTitle] = useState('')
@@ -102,6 +102,16 @@ export default function Home() {
   }
 
 // ---------- LOGIN ----------
+
+if (loading) {
+  return (
+    <div className="min-h-screen flex items-center justify-center text-white">
+      Loading...
+    </div>
+  )
+}
+
+
 
 if (!user) {
   return (
